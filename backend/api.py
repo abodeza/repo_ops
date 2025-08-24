@@ -26,17 +26,21 @@ class BlueprintRequest(BaseModel):
 @app.post("/ingest")
 def ingest(req: IngestRequest):
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
-
-    # Derive a friendly repo_id from URL last segment
     repo_id = req.repo_url.rstrip("/").split("/")[-1]
     if repo_id.endswith(".git"):
         repo_id = repo_id[:-4]
 
-    repo_dir = DATA_ROOT / repo_id
+    repo_dir = DATA_ROOT / repo_id  # <— per-repo directory
     try:
-        stats = build_index(req.repo_url, repo_dir)  # writes into data/<repo_id>/*
+        stats = build_index(req.repo_url, repo_dir)   # writes into data/<repo_id>/*
         modes = detect_modes(repo_dir)
-        return {"ok": True, "repo_id": repo_id, "modes": modes, **stats}
+        return {
+            "ok": True,
+            "repo_id": repo_id,
+            "source_url": req.repo_url,
+            "modes": modes,
+            **stats     # includes: n_files, n_chunks, sample_paths
+        }
     except Exception as e:
         raise HTTPException(400, f"Ingest failed: {e}")
 
@@ -57,7 +61,7 @@ def ask(req: AskRequest):
     if not repo_dir.exists():
         raise HTTPException(404, f"Unknown repo_id: {req.repo_id}")
     try:
-        r = Retriever(repo_dir)
+        r = Retriever(repo_dir)  # <— repo-scoped retriever
         out = r.answer(req.query, mode=req.mode)
         return {"ok": True, "answer": out}
     except Exception as e:

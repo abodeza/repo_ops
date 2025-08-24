@@ -12,7 +12,7 @@ API_BASE = st.secrets.get("API_URL", os.getenv("API_URL", "http://localhost:8000
 def api_post(path: str, payload: dict):
     url = f"{API_BASE}{path}"
     try:
-        r = requests.post(url, json=payload, timeout=120)
+        r = requests.post(url, json=payload, timeout=(5, 900))
         if r.ok:
             return r.json(), None
         return None, f"{r.status_code}: {r.text}"
@@ -147,7 +147,7 @@ with tabs[5]:
 # Footer tip
 st.markdown(
     "<hr/><small>Set your backend URL via <code>st.secrets</code> "
-    "(<code>.streamlit/secrets.toml</code> → <code>API_URL</code>) or the <code>API_URL</code> env var. "
+    "(<code>.streamlit/secrets.toml</code> → <code>API_URL</code>) or the <code>API_URL</code> secrets var. "
     "Default: <code>http://localhost:8000</code>.</small>",
     unsafe_allow_html=True,
 )
