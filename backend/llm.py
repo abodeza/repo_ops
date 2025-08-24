@@ -1,4 +1,8 @@
 import os, time, json, requests
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 AIML_API_KEY  = os.environ["AIML_API_KEY"]
 AIML_API_BASE = os.getenv("AIML_API_BASE", "https://api.aimlapi.com/v1")
