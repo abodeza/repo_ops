@@ -1,63 +1,28 @@
-import streamlit as st
-import requests
+import os, requests, streamlit as st
 
-API = st.secrets.get("API_URL","http://localhost:8000")
+st.set_page_config(page_title="Repo-Ops", page_icon="🛠️", layout="wide")
+st.title("Repo-Ops — GitHub RAG for ML Engineers")
 
-st.set_page_config(page_title="RepoOps Copilot", layout="wide")
-st.title("RepoOps Copilot")
+api = os.getenv("API_URL", "http://localhost:8000")
 
 with st.sidebar:
-    repo_url = st.text_input("GitHub Repo URL", placeholder="https://github.com/user/repo")
-    if st.button("Ingest", use_container_width=True) and repo_url:
-        r = requests.post(f"{API}/ingest", json={"repo_url": repo_url})
-        if r.ok:
-            st.session_state["repo"] = r.json()
-            st.success(f"Ingested: {st.session_state['repo']['repo_id']}")
+    st.header("1) Ingest a GitHub repo")
+    repo_url = st.text_input("GitHub URL", placeholder="https://github.com/org/repo")
+    if st.button("Ingest / Rebuild Index", use_container_width=True):
+        with st.spinner("Cloning & indexing..."):
+            r = requests.post(f"{api}/ingest", json={"repo_url": repo_url})
+        if r.ok and r.json().get("ok"):
+            st.success(f"Ingested ✅  files:{r.json()['n_files']} chunks:{r.json()['n_chunks']}")
         else:
-            st.error(r.text)
+            st.error(f"Failed: {r.text}")
 
-if "repo" not in st.session_state:
-    st.info("Enter a GitHub repo URL and click Ingest.")
-    st.stop()
+mode = st.radio("Mode", ["explain","stack","run","deploy"], horizontal=True)
+q = st.text_input("Your question", placeholder="Explain the training loop; or: give a deploy plan to GCP Cloud Run")
 
-repo_id = st.session_state["repo"]["repo_id"]
-modes = st.session_state["repo"]["modes"]
-tabs = st.tabs(["Run","Test","Deploy","Understand","Stack","Chat"])
-
-def blueprint(mode, tab):
-    with tab:
-        if not modes.get(mode, True):
-            st.warning(f"{mode} signals not detected; still attempting.")
-        if st.button(f"Generate {mode.title()} Plan", key=mode):
-            r = requests.post(f"{API}/blueprints", json={"repo_id": repo_id, "mode": mode})
-            if r.ok:
-                st.code(r.json()["answer"])
-            else:
-                st.error(r.text)
-
-blueprint("run", tabs[0])
-blueprint("test", tabs[1])
-blueprint("deploy", tabs[2])
-
-with tabs[3]:
-    if st.button("Explain Repo"):
-        r = requests.post(f"{API}/blueprints", json={"repo_id": repo_id, "mode":"understand"})
-        st.code(r.json()["answer"])
-
-with tabs[4]:
-    if st.button("Show Tech Stack"):
-        r = requests.post(f"{API}/blueprints", json={"repo_id": repo_id, "mode":"stack"})
-        st.code(r.json()["answer"])
-
-with tabs[5]:
-    q = st.text_area("Ask a question about the repo")
-    if st.button("Ask"):
-        r = requests.post(f"{API}/chat", json={"repo_id": repo_id, "question": q})
-        if r.ok:
-            data = r.json()
-            st.markdown(data["answer"])
-            with st.expander("Citations"):
-                for c in data["citations"]:
-                    st.write(f"{c['path']}:{c['start']}-{c['end']}")
-        else:
-            st.error(r.text)
+if st.button("Ask", type="primary"):
+    with st.spinner("Thinking with ChatGPT-5..."):
+        r = requests.post(f"{api}/ask", json={"query": q, "mode": mode})
+    if r.ok and r.json().get("ok"):
+        st.markdown(r.json()["answer"])
+    else:
+        st.error(r.text)
